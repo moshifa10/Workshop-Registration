@@ -28,6 +28,29 @@ public class Workshop {
 
     }
 
+    public Workshop(int id ,String title, String description, LocalDate workshopdate, int capacity){
+
+        this.title = title;
+        this.description = description;
+
+        if (capacity < 0){
+            throw new IllegalStateException("Capacity should be greater than 0 ");
+        }
+        if (workshopdate.isBefore(LocalDate.now())){
+            throw new IllegalStateException("THe date can't be before today's date");
+        }
+
+        if (id <= 0){
+            throw new IllegalStateException("Should be greater than 0 please");
+        }
+        this.workShopDate = workshopdate;
+        this.capacity = capacity;
+        this.id = id;
+
+        // Example Localdate - now -> 2026-10-13  ---- Instance 2026-01-06
+
+    }
+
     public int getId() {
         return id;
     }

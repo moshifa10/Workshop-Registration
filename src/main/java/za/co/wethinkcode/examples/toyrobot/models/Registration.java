@@ -16,6 +16,15 @@ public class Registration {
         this.workshop = workshop;
         this.registered_at = LocalDate.now();
     }
+    public Registration(int id, Participant participant, Workshop workshop){
+        if (id <= 0){
+            throw new IllegalArgumentException();
+        }
+        this.id = id;
+        this.participant = participant;
+        this.workshop = workshop;
+        this.registered_at = LocalDate.now();
+    }
 
     public int getId() {
         return id;

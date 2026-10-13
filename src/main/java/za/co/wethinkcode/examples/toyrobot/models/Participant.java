@@ -10,6 +10,15 @@ public class Participant {
         this.fullName = fullName;
         this.email = email;
     }
+    public Participant(int id ,String fullName, String email){
+        this.fullName = fullName;
+        this.email = email;
+
+        if (id <= 0){
+            throw new IllegalArgumentException("Should be greater than 0");
+        }
+        this.id = id;
+    }
 
     // Getters
     public int getId() {

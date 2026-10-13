@@ -6,25 +6,30 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ParticipantDao{
+public class ParticipantDao {
 
-    private Connection connection;
+    private final Connection connection;
 
-    public ParticipantDao(Connection connection){
+    public ParticipantDao(Connection connection) {
         this.connection = connection;
     }
 
-    public boolean insertParticipant(Participant participant){
+    public boolean insertParticipant(Participant participant) {
+        String sql = "INSERT INTO participants (full_name, email) VALUES (?,?)";
 
-        try {
-            String sql = "INSERT INTO participants (full_name, email) VALUES (?,?)";
-            PreparedStatement preparedStatement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             preparedStatement.setString(1, participant.getFullName());
             preparedStatement.setString(2, participant.getEmail());
-            participant.setId(preparedStatement.getGeneratedKeys().getInt(1));
+
             boolean isValid = preparedStatement.executeUpdate() == 1;
-            participant.setId(preparedStatement.getGeneratedKeys().getInt(1));
+
+            if (isValid) {
+                try (ResultSet rs = preparedStatement.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        participant.setId(rs.getInt(1));
+                    }
+                }
+            }
             return isValid;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -32,65 +37,71 @@ public class ParticipantDao{
         }
     }
 
-    public Participant findOnePartipant(int id){
+    public Participant findOnePartipant(int id) {
+        String sql = "SELECT id, full_name, email FROM participants WHERE id = ?";
 
-        try {
-            String sql = "SELECT * FROM participants WHERE id = " + "'" + id + "'";
-            Statement statement = connection.createStatement();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, id);
 
-            ResultSet resultSet = statement.executeQuery(sql);
-
-            while (resultSet.next()){
-                Participant participant = new Participant(resultSet.getString(2), resultSet.getString(3));
-                participant.setId(resultSet.getInt(1));
-                return participant;
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    Participant participant = new Participant(
+                            resultSet.getString("full_name"),
+                            resultSet.getString("email")
+                    );
+                    participant.setId(resultSet.getInt("id"));
+                    return participant;
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            return null;
         }
         return null;
     }
 
-    public List<Participant> allParticipants (){
-        try {
-            List<Participant> participants =  new ArrayList<>();
-            String sql = "SELECT * FROM participants";
-            Statement statement = connection.createStatement();
+    public List<Participant> allParticipants() {
+        List<Participant> participants = new ArrayList<>();
+        String sql = "SELECT id, full_name, email FROM participants";
 
-            ResultSet resultSet = statement.executeQuery(sql);
-            while (resultSet.next()){
-                Participant participantToAdd = new Participant(resultSet.getString(2), resultSet.getString(3));
-                participantToAdd.setId(resultSet.getInt(1));
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+
+            while (resultSet.next()) {
+                Participant participantToAdd = new Participant(
+                        resultSet.getString("full_name"),
+                        resultSet.getString("email")
+                );
+                participantToAdd.setId(resultSet.getInt("id"));
                 participants.add(participantToAdd);
             }
-            return participants.size() > 0 ? participants : null;
-        }catch (SQLException e){
-            e.printStackTrace();
-            return null;
-        }
-
-    }
-
-    public int countRegistrations(){
-        try {
-            String sql = "SELECT COUNT(*) FROM participants";
-            Statement statement = connection.createStatement();
-            return statement.executeQuery(sql).getInt(1);
+            return participants;
         } catch (SQLException e) {
             e.printStackTrace();
-            return 0;
+            return new ArrayList<>();
         }
     }
 
-    public boolean deleteParticipant(Participant participant){
+    public int countParticipants() {
+        String sql = "SELECT COUNT(*) FROM participants";
 
-        try {
-            String sql = "DELETE FROM participants WHERE id = " + "'" + participant.getId() + "'";
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            if (resultSet.next()) {
+                return resultSet.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
 
-            Statement statement = connection.createStatement();
-            return statement.execute(sql);
-        }catch (SQLException e){
+    public boolean deleteParticipant(Participant participant) {
+        String sql = "DELETE FROM participants WHERE id = ?";
+
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, participant.getId());
+            return statement.executeUpdate() == 1;
+        } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }

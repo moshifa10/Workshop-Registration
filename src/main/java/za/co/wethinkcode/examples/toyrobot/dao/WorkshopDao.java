@@ -1,6 +1,5 @@
 package za.co.wethinkcode.examples.toyrobot.dao;
 
-import za.co.wethinkcode.examples.toyrobot.models.Participant;
 import za.co.wethinkcode.examples.toyrobot.models.Workshop;
 
 import java.sql.*;
@@ -9,24 +8,36 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WorkshopDao {
-    private Connection connection;
+    private final Connection connection;
 
-    public WorkshopDao(Connection connection){
+    public WorkshopDao(Connection connection) {
         this.connection = connection;
     }
 
-    public boolean insertWorkshop(Workshop workshop){
+    public boolean insertWorkshop(Workshop workshop) {
+        String sql = "INSERT INTO workshops (title, description, work_date, capacity) VALUES (?,?,?,?)";
 
-        try {
-            String sql = "INSERT INTO workshops (title, description, work_date, capacity) VALUES (?,?,?,?)";
-            PreparedStatement preparedStatement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-            preparedStatement.setString(1, workshop.getTitle()) ;
+            preparedStatement.setString(1, workshop.getTitle());
             preparedStatement.setString(2, workshop.getDescription());
-            preparedStatement.setString(3, workshop.getWorkdate().toString());
+
+            if (workshop.getWorkdate() != null) {
+                preparedStatement.setString(3, workshop.getWorkdate().toString());
+            } else {
+                preparedStatement.setNull(3, Types.VARCHAR);
+            }
             preparedStatement.setInt(4, workshop.getCapacity());
-            workshop.setId(preparedStatement.getGeneratedKeys().getInt(1));
+
             boolean isValid = preparedStatement.executeUpdate() == 1;
+
+            if (isValid) {
+                try (ResultSet rs = preparedStatement.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        workshop.setId(rs.getInt(1));
+                    }
+                }
+            }
             return isValid;
         } catch (Exception e) {
             e.printStackTrace();
@@ -34,70 +45,88 @@ public class WorkshopDao {
         }
     }
 
+    public Workshop findOneWorkShop(int id) {
+        String sql = "SELECT id, title, description, work_date, capacity FROM workshops WHERE id = ?";
 
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, id);
 
-    public Workshop findOneWorkShop(int id){
-
-        try {
-            String sql = "SELECT * FROM workshops WHERE id = " + "'" + id + "'";
-            Statement statement = connection.createStatement();
-
-            ResultSet resultSet = statement.executeQuery(sql);
-
-
-
-            while (resultSet.next()){
-                String[] date = resultSet.getString(4).split("-");
-                Workshop workshop = new Workshop(resultSet.getString(2), resultSet.getString(3), (LocalDate.of(Integer.getInteger(date[0]), Integer.getInteger(date[1]), Integer.getInteger(date[2]))), resultSet.getInt(5));
-                workshop.setId(resultSet.getInt(1));
-                return workshop;
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return mapRowToWorkshop(resultSet);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            return null;
         }
         return null;
     }
 
-    public List<Participant> allParticipants (){
-        try {
-            List<Participant> participants =  new ArrayList<>();
-            String sql = "SELECT * FROM participants";
-            Statement statement = connection.createStatement();
+    public List<Workshop> allWorkShops() {
+        List<Workshop> workshops = new ArrayList<>();
+        String sql = "SELECT id, title, description, work_date, capacity FROM workshops";
 
-            ResultSet resultSet = statement.executeQuery(sql);
-            while (resultSet.next()){
-                participants.add(new Participant(resultSet.getString(1),resultSet.getString(2)));
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+
+            while (resultSet.next()) {
+                workshops.add(mapRowToWorkshop(resultSet));
             }
-            return participants.size() > 0 ? participants : null;
-        }catch (SQLException e){
-            e.printStackTrace();
-            return null;
-        }
-
-    }
-
-    public int countRegistrations(){
-        try {
-            String sql = "SELECT COUNT(*) FROM participants";
-            Statement statement = connection.createStatement();
-            return statement.executeQuery(sql).getInt(1);
+            return workshops;
         } catch (SQLException e) {
             e.printStackTrace();
-            return 0;
+            return new ArrayList<>();
         }
     }
 
-    public boolean deleteParticipant(Participant participant){
+    public int countWorkshops() {
+        String sql = "SELECT COUNT(*) FROM workshops";
 
-        try {
-            String sql = "DELETE FROM participants WHERE id = " + "'" + participant.getId() + "'";
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            if (resultSet.next()) {
+                return resultSet.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
 
-            Statement statement = connection.createStatement();
-            return statement.execute(sql);
-        }catch (SQLException e){
+    public boolean deleteWorkShop(Workshop workshop) {
+        String sql = "DELETE FROM workshops WHERE id = ?";
+
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, workshop.getId());
+            return statement.executeUpdate() == 1;
+        } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }
+    }
+
+    private Workshop mapRowToWorkshop(ResultSet resultSet) throws SQLException {
+        int id = resultSet.getInt("id");
+        String title = resultSet.getString("title");
+        String description = resultSet.getString("description");
+        int capacity = resultSet.getInt("capacity");
+
+        String rawDate = resultSet.getString("work_date");
+        LocalDate localDate = null;
+
+        if (rawDate != null && !rawDate.isBlank()) {
+            String[] dateParts = rawDate.split("-");
+            if (dateParts.length == 3) {
+                localDate = LocalDate.of(
+                        Integer.parseInt(dateParts[0]),
+                        Integer.parseInt(dateParts[1]),
+                        Integer.parseInt(dateParts[2])
+                );
+            }
+        }
+
+        Workshop workshop = new Workshop(title, description, localDate, capacity);
+        workshop.setId(id);
+        return workshop;
     }
 }
