@@ -12,6 +12,7 @@ public class ParticipantDao {
 
     public ParticipantDao(Connection connection) {
         this.connection = connection;
+
     }
 
     public boolean insertParticipant(Participant participant) {
